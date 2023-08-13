@@ -1,113 +1,161 @@
-from collections import defaultdict, Counter
-from queue import PriorityQueue
+import numpy as np
 
+def transition_helper(u,v,tags):
+    count_u=0
+    count_u_to_v=0
+    for i in range(len(tags)):
+        if tags[i]==u:
+            count_u+=1
+            if tags[i+1]==v:
+                count_u_to_v+=1
+    return count_u_to_v/count_u
 
-def estimate_emission_params(train_path, k=1):
-    token_tag_count = Counter()
-    tag_count = defaultdict(int)
-    
-    with open(train_path, 'r', encoding='utf-8') as file:
-        for line in file:
-            line = line.strip()
-            if line:
-                token, tag = line.rsplit(' ', 1)
-                token_tag_count[(token, tag)] += 1
-                tag_count[tag] += 1
-    
-    emission_params = defaultdict(lambda: defaultdict(float))
-    unk_denominator = k + sum(tag_count.values())
-    
-    for (token, tag), count in token_tag_count.items():
-        emission_params[token][tag] = count / (tag_count[tag] + k)
-        emission_params['#UNK#'][tag] = k / unk_denominator
-    
-    return emission_params
+def transition(tags):
+    tags.insert(0,"START")
+    tags.append("STOP")
+    transition_parameters={}
+    for i in range(len(tags)):
+        if tags[i]=="STOP":
+            break
+        if (tags[i],tags[i+1]) not in transition_parameters:
+            transition_parameters[(tags[i],tags[i+1])]=transition_helper(tags[i],tags[i+1],tags)
+    del tags[0]
+    del tags[-1]
+    return transition_parameters
 
-def estimate_transition_params(train_path):
-    transition_count = defaultdict(Counter)
-    tag_count = defaultdict(int)
-    START = 'START'
-    STOP = 'STOP'
-    
-    with open(train_path, 'r', encoding='utf-8') as file:
-        prev_tag = START
-        for line in file:
-            line = line.strip()
-            if line:
-                _, tag = line.rsplit(' ', 1)
-                transition_count[prev_tag][tag] += 1
-                tag_count[prev_tag] += 1
-                prev_tag = tag
+def emission_helper(x, y,tags, words=None, k=1):
+    count_y=0
+    if x=="#UNK#":
+        for i in tags:
+            if i==y:
+                count_y+=1
+        return k/(count_y+k)
+    count_y_to_x=0
+    for i in range(len(tags)):
+        if tags[i] == y:
+            count_y += 1
+            if words[i] == x:
+                count_y_to_x += 1
+    return (count_y_to_x) / (count_y + k)
+
+def emission(tags,train_words,test_words):
+    emission_word_tag={}
+    for x in np.unique(np.array(test_words)):
+        y_val={}
+        for y in np.unique(np.array(tags)):
+            if x in train_words:
+                ep = emission_helper(x, y,tags,train_words)
+                y_val.update({y:ep})
             else:
-                transition_count[prev_tag][STOP] += 1
-                tag_count[prev_tag] += 1
-                prev_tag = START
+                ep = emission_helper("#UNK#", y,tags)
+                y_val.update({y:ep})
+        emission_word_tag[x] = y_val
+    return emission_word_tag
+
+def viterbi(sequence, tags, transition_parameters, emission_parameters):
+    n = len(sequence)
+    num_tags = len(tags)
+
+    LTR=np.zeros((num_tags,n))
+    RTL=np.zeros((num_tags,n))
+
+
+    first_word=sequence[0]
+    for i in range(num_tags):
+        if ("START", tags[i]) not in transition_parameters:
+            LTR[i, 0] = 1e-10*emission_parameters[first_word][tags[i]]
+        else:
+            LTR[i, 0] = transition_parameters[("START", tags[i])] * emission_parameters[first_word][tags[i]]
+
+    for w in range(1, n):
+        for i in range(0,num_tags):
+            max_prob = -1
+            max_backpointer = -1
+            for j in range(0,num_tags):
+                if (tags[j],tags[i]) not in transition_parameters:
+                    prob = LTR[j, w-1] * 1e-10 * emission_parameters[sequence[w]][tags[i]]
+                else:
+                    prob = LTR[j, w-1] * transition_parameters[(tags[j], tags[i])] * emission_parameters[sequence[w]][tags[i]]
+
+                if prob > max_prob:
+                    max_prob = prob
+                    max_backpointer = j
+            
+            LTR[i, w] = max_prob
+            RTL[i, w] = max_backpointer
     
-    transition_params = defaultdict(lambda: defaultdict(float))
-    total_tags = sum(tag_count.values())
+    stop_max_prob = -1
+    stop_max_backpointer = -1
+    for i in range(num_tags):
+        if (tags[i],"STOP") not in transition_parameters:
+            prob = LTR[i, n-1] * 1e-10
+        else:
+            prob = LTR[i, n-1] * transition_parameters[(tags[i], "STOP")]
+
+        if prob > stop_max_prob:
+            stop_max_prob = prob
+            stop_max_backpointer = i
     
-    for tag1, transitions in transition_count.items():
-        for tag2, count in transitions.items():
-            transition_params[tag1][tag2] = count / tag_count[tag1]
-    
-    transition_params[START][START] = 1.0  # Start tag always transitions to itself
-    
-    return transition_params
+    # Retrieve the best path using backpointers
+    best_path = []
+    for w in range(n-1,-1,-1):
+        best_path.insert(0,tags[stop_max_backpointer])
+        if w==0:
+            break
+        stop_max_backpointer=int(RTL[stop_max_backpointer,w])
 
-def add_start_stop_tags(sentence):
-    return ["START"] + sentence + ["STOP"]
+    return best_path
 
-def viterbi(emission_parameters, transition_parameters, sentence, k=1):
-    words = sentence.split()
-    n = len(words)
+def process_dataset(train_path, dev_in_path, dev_out_path, dev_predicted_path):
+    train_file = open(train_path, "r", encoding="utf-8")
+    train_words = []
+    tags = []
+    # ... (your previous train file reading code)
+    for l in train_file:
+        if l!="\n":
+            lst=l.split()
+            x=""
+            for i in range(len(lst)-1):
+                x+=lst[i]+" "
+            x=x[0:-1]
+            y=lst[-1]
+            train_words.append(x)
+            tags.append(y)
 
-    viterbi_matrix = defaultdict(lambda: defaultdict(PriorityQueue))
+    test_file = open(dev_in_path, "r", encoding="utf-8")
+    test_words = []
+    # ... (your previous test file reading code)
+    for line in test_file:
+        if line.strip():  # Non-empty line
+            sequence.append(line.strip())
+        else:  # Empty line indicates end of sequence
+            predicted_tags = viterbi(sequence, np.unique(tags), transition_parameters, emission_word_tag)
+            for word, tag in zip(sequence, predicted_tags):
+                pred_output.write(f"{word} {tag}\n")
+            pred_output.write("\n")
+            pred_output.flush()
+            sequence = []
 
-    viterbi_matrix[0]['START'].put((-1.0, ['START']))
+    emission_word_tag = emission(tags, train_words, test_words)
+    transition_parameters = transition(tags)
 
-    for t in range(1, n+1):
-        word = words[t-1]
-        if word not in emission_parameters:
-            word = '#UNK#'
-        for v in emission_parameters[word]:
-            for u in viterbi_matrix[t-1]:
-                for score, path in viterbi_matrix[t-1][u].queue:
-                    transition_prob = transition_parameters[u][v]
-                    emission_prob = emission_parameters[word][v]
-                    new_score = score * transition_prob * emission_prob
-                    new_path = path + [v]
-                    viterbi_matrix[t][v].put((-new_score, new_path))
-                    if viterbi_matrix[t][v].qsize() > k:
-                        viterbi_matrix[t][v].get()  # Remove lowest score
+    pred_output = open(dev_predicted_path, "w", encoding="utf-8")
+    sequence = []
 
-    opt_paths = []
-    for tag in viterbi_matrix[n]:
-        for score, path in viterbi_matrix[n][tag].queue:
-            opt_paths.append((-score, path[1:]))
+    for l in test_file:
+        if l != "\n":
+            sequence.append(l.strip())
+        else:
+            predicted_tags = viterbi(
+                sequence, np.unique(tags), transition_parameters, emission_word_tag)
+            for i in range(len(predicted_tags)):
+                pred_output.write(sequence[i] + " " + predicted_tags[i] + "\n")
+            pred_output.write("\n")
+            sequence = []
 
-    sorted_paths = sorted(opt_paths)
-    if k <= len(sorted_paths):
-        return sorted_paths[k-1][1]
-    else:
-        default = ['O'] * n
-        return default
+    pred_output.close()
 
-def calculate_metrics(predicted_tags, actual_tags):
-    tp = sum(1 for pred, actual in zip(predicted_tags, actual_tags)
-             if pred == actual and pred != 'O')
-    fp = sum(1 for pred, actual in zip(predicted_tags, actual_tags)
-             if pred != actual and pred != 'O')
-    fn = sum(1 for pred, actual in zip(predicted_tags, actual_tags)
-             if pred != actual and actual != 'O')
-
-    precision = tp / (tp + fp) if tp + fp != 0 else 0.0
-    recall = tp / (tp + fn) if tp + fn != 0 else 0.0
-    f_score = 2 * precision * recall / \
-        (precision + recall) if precision + recall != 0 else 0.0
-
-    return precision, recall, f_score
-
-
+# Paths for both datasets
 train_path_es = "Data/ES/train"
 dev_in_path_es = "Data/ES/dev.in"
 dev_out_path_es = "Data/ES/dev.out"
@@ -118,97 +166,8 @@ dev_in_path_ru = "Data/RU/dev.in"
 dev_out_path_ru = "Data/RU/dev.out"
 dev_predicted_path_ru = "Data/RU/dev.p2.out"
 
-# Estimation for ES
-emission_params_es = estimate_emission_params(train_path_es)
-transition_params_es = estimate_transition_params(train_path_es)
+# Process the ES dataset
+process_dataset(train_path_es, dev_in_path_es, dev_out_path_es, dev_predicted_path_es)
 
-# Estimation for RU
-emission_params_ru = estimate_emission_params(train_path_ru)
-transition_params_ru = estimate_transition_params(train_path_ru)
-
-# Dev set processing for ES
-with open(dev_in_path_es, 'r', encoding='utf-8') as file:
-    with open(dev_predicted_path_es, 'w', encoding='utf-8') as file_write_es:
-            sentences = []
-            for line in file:
-                word = line.strip()
-                if word:
-                    sentences.append(word)
-                else:
-                    sentences = add_start_stop_tags(sentences)
-                    
-                    predicted_tags_es = viterbi(
-                        emission_params_es, transition_params_es, ' '.join(sentences))
-
-                    for word, tag in zip(sentences[1:-1], predicted_tags_es[1:-1]):
-                        file_write_es.write(f"{word} {tag}\n")
-                    file_write_es.write("\n")
-
-                    sentences = []
-
-# Dev set processing for RU
-with open(dev_in_path_ru, 'r', encoding='utf-8') as file:
-    with open(dev_predicted_path_ru, 'w', encoding='utf-8') as file_write_ru:
-            sentences = []
-            for line in file:
-                word = line.strip()
-                if word:
-                    sentences.append(word)
-                else:
-                    sentences = add_start_stop_tags(sentences)
-                    
-                    predicted_tags_ru = viterbi(
-                        emission_params_ru, transition_params_ru, ' '.join(sentences))
-                    
-                    for word, tag in zip(sentences[1:-1], predicted_tags_ru[1:-1]):
-                        file_write_ru.write(f"{word} {tag}\n")
-                    file_write_ru.write("\n")
-
-                    sentences = []
-
-# Load the actual tags from ES/dev.out
-actual_tags_es = []
-with open(dev_out_path_es, 'r', encoding='utf-8') as file:
-    for line in file:
-        tag = line.strip().rsplit(' ', 1)
-        actual_tags_es.append(tag)
-
-# Load the predicted tags from ES/dev.p2.out
-predicted_tags_es = []
-with open(dev_predicted_path_es, 'r', encoding='utf-8') as file:
-    for line in file:
-        tag = line.strip().rsplit(' ', 1)
-        predicted_tags_es.append(tag)
-
-# Separator
-print("\n######## ES METRIC CALCULATIONS ########\n")
-
-# Calculate metrics for ES, k=1
-precision_es, recall_es, f_score_es = calculate_metrics(
-    predicted_tags_es, actual_tags_es)
-print("ES, - Precision:", precision_es)
-print("ES, - Recall:", recall_es)
-print("ES, - F-score:", f_score_es)
-
-# Load the actual tags from RU/dev.out
-actual_tags_ru = []
-with open(dev_out_path_ru, 'r', encoding='utf-8') as file:
-    for line in file:
-        tag = line.strip().rsplit(' ', 1)
-        actual_tags_ru.append(tag)
-
-# Load the predicted tags from RU/dev.p2.out
-predicted_tags_ru = []
-with open(dev_predicted_path_ru, 'r', encoding='utf-8') as file:
-    for line in file:
-        tag = line.strip().rsplit(' ', 1)
-        predicted_tags_ru.append(tag)
-# Separator
-print("\n######## RU METRIC CALCULATIONS ########\n")
-
-# Calculate metrics for RU, k=1
-precision_ru, recall_ru, f_score_ru = calculate_metrics(
-    predicted_tags_ru, actual_tags_ru)
-print("RU, - Precision:", precision_ru)
-print("RU, - Recall:", recall_ru)
-print("RU, - F-score:", f_score_ru)
+# Process the RU dataset
+process_dataset(train_path_ru, dev_in_path_ru, dev_out_path_ru, dev_predicted_path_ru)

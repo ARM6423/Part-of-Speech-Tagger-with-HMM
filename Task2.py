@@ -110,44 +110,39 @@ def process_dataset(train_path, dev_in_path, dev_out_path, dev_predicted_path):
     train_file = open(train_path, "r", encoding="utf-8")
     train_words = []
     tags = []
-    # ... (your previous train file reading code)
     for l in train_file:
-        if l!="\n":
-            lst=l.split()
-            x=""
-            for i in range(len(lst)-1):
-                x+=lst[i]+" "
-            x=x[0:-1]
-            y=lst[-1]
+        if l != "\n":
+            lst = l.split()
+            x = " ".join(lst[:-1])  # Joining words excluding the last one
+            y = lst[-1]
             train_words.append(x)
             tags.append(y)
 
     test_file = open(dev_in_path, "r", encoding="utf-8")
     test_words = []
-    # ... (your previous test file reading code)
     for line in test_file:
         if line.strip():  # Non-empty line
-            sequence.append(line.strip())
+            test_words.append(line.strip())
         else:  # Empty line indicates end of sequence
-            predicted_tags = viterbi(sequence, np.unique(tags), transition_parameters, emission_word_tag)
-            for word, tag in zip(sequence, predicted_tags):
+            predicted_tags = viterbi(test_words, np.unique(tags), transition_parameters, emission_word_tag)
+            for word, tag in zip(test_words, predicted_tags):
                 pred_output.write(f"{word} {tag}\n")
             pred_output.write("\n")
             pred_output.flush()
-            sequence = []
+            test_words = []
 
-    emission_word_tag = emission(tags, train_words, test_words)
-    transition_parameters = transition(tags)
+    transition_parameters = transition(tags)  # Calculate transition parameters
+    emission_word_tag = emission(tags, train_words, test_words)  # Calculate emission parameters
 
     pred_output = open(dev_predicted_path, "w", encoding="utf-8")
-    sequence = []
+
+    sequence = []  # Define sequence list
 
     for l in test_file:
         if l != "\n":
             sequence.append(l.strip())
         else:
-            predicted_tags = viterbi(
-                sequence, np.unique(tags), transition_parameters, emission_word_tag)
+            predicted_tags = viterbi(sequence, np.unique(tags), transition_parameters, emission_word_tag)
             for i in range(len(predicted_tags)):
                 pred_output.write(sequence[i] + " " + predicted_tags[i] + "\n")
             pred_output.write("\n")

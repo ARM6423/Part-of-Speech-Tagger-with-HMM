@@ -1,4 +1,4 @@
-# 50.007 Machine Learning - Summer 2023
+# 50.007 Machine Learning - Summer 2023 - 1D Project
 
 ## Team Members
 - Anutham Mukunthan

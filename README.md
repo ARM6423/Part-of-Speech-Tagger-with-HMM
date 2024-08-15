@@ -1,59 +1,51 @@
-# 50.007 Machine Learning - Summer 2023 - 1D Project
+#Task 1
 
-## Team Members
-- Anutham Mukunthan
-- Ansh Oswal
-- Jash Jignesh Veragiwala
-- Atul Parida
+# run the Task1.py file - it should create output in Data/ES and Data/RU folder
 
-## Task 1
+# then on terminal run :
 
-Run the Task1.py file - it should create output files in the Data/ES and Data/RU folders.
+# python EvalScript/evalResult.py data/es/dev.out data/es/dev.p1.out
 
-Then on your terminal run:
+# python EvalScript/evalResult.py data/ru/dev.out data/ru/dev.p1.out
 
-```python EvalScript/evalResult.py data/es/dev.out data/es/dev.p1.out```
+# to see the desired output
 
-```python EvalScript/evalResult.py data/ru/dev.out data/ru/dev.p1.out```
+#Task 2
 
-to see the desired output.
+# run the Task2.py file - it should create output in Data/ES and Data/RU folder
 
-## Task 2
+# then on terminal run :
 
-Run the Task2.py file - it should create output files in the Data/ES and Data/RU folders.
+# python EvalScript/evalResult.py data/es/dev.out data/es/dev.p2.out
 
-then on your terminal run:
+# python EvalScript/evalResult.py data/ru/dev.out data/ru/dev.p2.out
 
-```python EvalScript/evalResult.py data/es/dev.out data/es/dev.p2.out```
+# to see the desired output
 
-```python EvalScript/evalResult.py data/ru/dev.out data/ru/dev.p2.out```
+#Task 3
 
-to see the desired output.
+# run the Task3.py file - it should create output in Data/ES and Data/RU folder
 
-## Task 3
+# then on terminal run :
 
-Run the Task3.py file - it should create output files in the Data/ES and Data/RU folders.
+# python EvalScript/evalResult.py data/es/dev.out data/es/dev.p3.2nd.out
 
-Then on your terminal run:
+# python EvalScript/evalResult.py data/es/dev.out data/es/dev.p3.8th.out
 
-```python EvalScript/evalResult.py data/es/dev.out data/es/dev.p3.2nd.out```
+# python EvalScript/evalResult.py data/ru/dev.out data/ru/dev.p3.2nd.out
 
-```python EvalScript/evalResult.py data/es/dev.out data/es/dev.p3.8th.out```
+# python EvalScript/evalResult.py data/ru/dev.out data/ru/dev.p3.8th.out
 
-```python EvalScript/evalResult.py data/ru/dev.out data/ru/dev.p3.2nd.out```
+# to see the desired output
 
-```python EvalScript/evalResult.py data/ru/dev.out data/ru/dev.p3.8th.out```
+#Task 4
 
-to see the desired output.
+# run the Task4.py file - it should create output in Data/ES and Data/RU folder
 
-## Task 4
+# then on terminal run :
 
-Run the Task4.py file - it should create output files in the Data/ES and Data/RU folders.
+# python EvalScript/evalResult.py data/es/dev.out data/es/dev.p4_2.out
 
-Then on your terminal run:
+# python EvalScript/evalResult.py data/ru/dev.out data/ru/dev.p4_2.out
 
-```python EvalScript/evalResult.py data/es/dev.out data/es/dev.p4_2.out```
-
-```python EvalScript/evalResult.py data/ru/dev.out data/ru/dev.p4_2.out```
-
-to see the desired output.
+# to see the desired output
